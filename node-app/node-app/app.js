@@ -1,12 +1,17 @@
 const express = require('express');
 const axios = require('axios');
+const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
+// Middleware to serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Route for homepage
 app.get('/', (req, res) => {
     const html = `
-        <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -138,6 +143,28 @@ app.get('/', (req, res) => {
             margin-top: 40px;
         }
         
+        /* Quote Section */
+        .quote-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            margin: 40px auto;
+            max-width: 800px;
+            text-align: center;
+        }
+        
+        .quote {
+            font-size: 1.5rem;
+            font-style: italic;
+            margin-bottom: 15px;
+        }
+        
+        .author {
+            font-size: 1.2rem;
+            color: #7f8c8d;
+        }
+        
         /* Responsive Design */
         @media (max-width: 768px) {
             .header-content {
@@ -164,8 +191,8 @@ app.get('/', (req, res) => {
                 <div class="logo">MySite</div>
                 <nav>
                     <ul>
-                        <li><a href="#">Home</a></li>
-                        <li><a href="#">About</a></li>
+                        <li><a href="/">Home</a></li>
+                        <li><a href="/quote">Get Quote</a></li>
                         <li><a href="#">Services</a></li>
                         <li><a href="#">Contact</a></li>
                     </ul>
@@ -179,7 +206,7 @@ app.get('/', (req, res) => {
         <div class="container">
             <h2>Welcome to Our Website</h2>
             <p>A clean, responsive template that works on all devices</p>
-            <a href="#" class="btn">Get Started</a>
+            <a href="/quote" class="btn">Get Random Quote</a>
         </div>
     </section>
 
@@ -207,23 +234,79 @@ app.get('/', (req, res) => {
             <p>&copy; 2023 MySite. All rights reserved.</p>
         </div>
     </footer>
+
+    <script>
+        // Client-side JavaScript for handling quote display
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if we're on the quote page
+            if(window.location.pathname === '/quote') {
+                fetchQuote();
+            }
+            
+            // Handle quote button click
+            document.querySelector('.btn')?.addEventListener('click', function(e) {
+                if(this.getAttribute('href') === '/quote') {
+                    e.preventDefault();
+                    fetchQuote();
+                }
+            });
+            
+            async function fetchQuote() {
+                try {
+                    const response = await fetch('/api/quote');
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    
+                    const data = await response.json();
+                    
+                    // Create quote display
+                    const quoteHTML = \`
+                        <div class="quote-container">
+                            <p class="quote">"\${data.quote}"</p>
+                            <p class="author">- \${data.author}</p>
+                            <a href="/" class="btn">Back to Home</a>
+                        </div>
+                    \`;
+                    
+                    // Replace main content with quote
+                    document.querySelector('main').innerHTML = quoteHTML;
+                } catch (error) {
+                    console.error('Error fetching quote:', error);
+                    document.querySelector('main').innerHTML = \`
+                        <div class="quote-container">
+                            <p>Failed to load quote. Please try again later.</p>
+                            <a href="/" class="btn">Back to Home</a>
+                        </div>
+                    \`;
+                }
+            }
+        });
+    </script>
 </body>
 </html>
     `;
     res.send(html);
 });
 
-app.get('/quote', async (req, res) => {
+// API endpoint for quotes
+app.get('/api/quote', async (req, res) => {
     try {
         const response = await axios.get('https://programming-quotes-api.herokuapp.com/quotes/random');
-        const quote = response.data.en;
-        const author = response.data.author;
-        res.send(`<h2>"${quote}"</h2><p>- ${author}</p><a href="/">Back</a>`);
+        res.json({
+            quote: response.data.en,
+            author: response.data.author
+        });
     } catch (error) {
-        res.send('<p>Failed to fetch quote. Try again later.</p><a href="/">Back</a>');
+        console.error('Error fetching quote:', error);
+        res.status(500).json({ error: 'Failed to fetch quote' });
     }
 });
 
+// Route for direct quote page
+app.get('/quote', (req, res) => {
+    res.redirect('/');
+});
+
+// Start the server
 app.listen(PORT, () => {
-    console.log(`App running on port ${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
 });
